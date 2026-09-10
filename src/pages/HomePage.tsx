@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useMoneyFlow } from '../context/MoneyFlowContext';
 import {
   getAvailableMoney,
@@ -11,7 +11,7 @@ import {
   getTotalSpent,
 } from '../utils/calculations';
 import { formatCurrency, formatDate } from '../utils/formatters';
-import { ArrowUpRight, ChevronRight, Plus, Wallet, AlertTriangle, ArrowRightLeft } from 'lucide-react';
+import { ArrowUpRight, ChevronRight, Plus, Wallet, AlertTriangle, ArrowRightLeft, Eye, EyeOff } from 'lucide-react';
 import { Category, MoneySource, Spend } from '../types/money';
 
 interface HomePageProps {
@@ -40,6 +40,9 @@ export const HomePage: React.FC<HomePageProps> = ({
   onNavigateToSources,
 }) => {
   const { sources, spends, transfers, categories } = useMoneyFlow();
+
+  // Single privacy memory state controlling Total Summary & Money Source card visibility
+  const [isBalanceVisible, setIsBalanceVisible] = useState<boolean>(false);
 
   const totalAvailable = getAvailableMoney(sources, spends);
   const totalAdded = getTotalMoneyAdded(sources);
@@ -81,12 +84,26 @@ export const HomePage: React.FC<HomePageProps> = ({
       <div className="relative overflow-hidden p-5 rounded-3xl bg-gradient-to-br from-emerald-950 via-slate-900 to-slate-900 border border-emerald-500/30 shadow-xl space-y-4">
         <div className="flex items-center justify-between text-xs font-medium text-emerald-400 uppercase tracking-wider">
           <span>Total Available</span>
-          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px]">
-            Live Balance
-          </span>
+          <div className="flex items-center space-x-2">
+            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px]">
+              Live Balance
+            </span>
+            {/* The ONLY privacy toggle button on the Home Page */}
+            <button
+              onClick={() => setIsBalanceVisible(!isBalanceVisible)}
+              className="p-1 rounded-lg text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 transition min-w-[32px] min-h-[32px] flex items-center justify-center"
+              aria-label={isBalanceVisible ? 'Hide balances' : 'Show balances'}
+            >
+              {isBalanceVisible ? (
+                <Eye className="w-4 h-4" />
+              ) : (
+                <EyeOff className="w-4 h-4" />
+              )}
+            </button>
+          </div>
         </div>
         <div className="text-3xl font-extrabold text-white tracking-tight">
-          {formatCurrency(totalAvailable)}
+          {isBalanceVisible ? formatCurrency(totalAvailable) : '₹••••••'}
         </div>
 
         <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800/80">
@@ -95,7 +112,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               Money Added
             </span>
             <span className="text-sm font-semibold text-slate-200">
-              {formatCurrency(totalAdded)}
+              {isBalanceVisible ? formatCurrency(totalAdded) : '₹••••••'}
             </span>
           </div>
           <div>
@@ -103,7 +120,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               Total Spent
             </span>
             <span className="text-sm font-semibold text-amber-400">
-              {formatCurrency(totalSpent)}
+              {isBalanceVisible ? formatCurrency(totalSpent) : '₹••••••'}
             </span>
           </div>
         </div>
@@ -146,7 +163,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                     {source.name}
                   </div>
                   <div className="text-base font-bold text-white">
-                    {formatCurrency(balance)}
+                    {isBalanceVisible ? formatCurrency(balance) : '₹••••••'}
                   </div>
                 </div>
               );
