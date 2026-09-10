@@ -56,13 +56,21 @@ export const HomePage: React.FC<HomePageProps> = ({
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 4);
 
+  const getGreeting = (): string => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) return 'Good morning';
+    if (hour >= 12 && hour < 17) return 'Good afternoon';
+    if (hour >= 17 && hour < 21) return 'Good evening';
+    return 'Good night';
+  };
+
   return (
     <div className="space-y-5">
       {/* Header with Dual Quick Action Buttons: + Spend and ↔ Transfer */}
       <div className="flex items-center justify-between pt-1">
         <div>
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-            Good morning
+            {getGreeting()}
           </span>
           <h1 className="text-xl font-bold text-white tracking-tight">Money Flow</h1>
         </div>
