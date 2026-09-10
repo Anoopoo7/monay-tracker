@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useMoneyFlow } from '../context/MoneyFlowContext';
+import { usePrivacy } from '../context/PrivacyContext';
 import {
   getAvailableMoney,
   getCategoryPercentage,
@@ -11,7 +12,7 @@ import {
   getTotalSpent,
 } from '../utils/calculations';
 import { formatCurrency, formatDate } from '../utils/formatters';
-import { ArrowUpRight, ChevronRight, Plus, Wallet, AlertTriangle, ArrowRightLeft, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
+import { ArrowUpRight, ChevronRight, Plus, Wallet, AlertTriangle, ArrowRightLeft, Eye, EyeOff, CheckCircle2, BarChart3 } from 'lucide-react';
 import { Category, MoneySource, Spend } from '../types/money';
 
 interface HomePageProps {
@@ -25,6 +26,7 @@ interface HomePageProps {
   onNavigateToHistory: () => void;
   onNavigateToCategories: () => void;
   onNavigateToSources: () => void;
+  onNavigateToInsights: () => void;
 }
 
 export const HomePage: React.FC<HomePageProps> = ({
@@ -38,11 +40,11 @@ export const HomePage: React.FC<HomePageProps> = ({
   onNavigateToHistory,
   onNavigateToCategories,
   onNavigateToSources,
+  onNavigateToInsights,
 }) => {
   const { sources, spends, transfers, categories } = useMoneyFlow();
+  const { isBalanceVisible, toggleBalanceVisibility } = usePrivacy();
 
-  // Single privacy memory state controlling Total Summary & Money Source card visibility
-  const [isBalanceVisible, setIsBalanceVisible] = useState<boolean>(false);
 
   const totalAvailable = getAvailableMoney(sources, spends);
   const totalAdded = getTotalMoneyAdded(sources);
@@ -92,7 +94,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             </span>
             {/* The ONLY privacy toggle button on the Home Page */}
             <button
-              onClick={() => setIsBalanceVisible(!isBalanceVisible)}
+              onClick={toggleBalanceVisibility}
               className="p-1 rounded-lg text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 transition min-w-[32px] min-h-[32px] flex items-center justify-center"
               aria-label={isBalanceVisible ? 'Hide balances' : 'Show balances'}
             >
@@ -173,6 +175,15 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         )}
       </div>
+
+      {/* Button to navigate to Insights & Progress dashboard */}
+      <button
+        onClick={onNavigateToInsights}
+        className="w-full mt-2 py-3 px-4 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-2xl text-xs font-bold flex items-center justify-center space-x-2 transition active:scale-[0.99] shadow-sm"
+      >
+        <BarChart3 className="w-4 h-4 text-emerald-400" />
+        <span> View Insights & Progress →</span>
+      </button>
 
       {/* Construction Budget Section - Displays ONLY active jobs */}
       <div className="space-y-2.5">

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { MoneyFlowProvider } from './context/MoneyFlowContext';
+import { PrivacyProvider } from './context/PrivacyContext';
 import { MobileShell } from './components/layout/MobileShell';
 import { BottomNav, TabType } from './components/layout/BottomNav';
 import { HomePage } from './pages/HomePage';
@@ -7,6 +8,7 @@ import { CategoriesPage } from './pages/CategoriesPage';
 import { SourcesPage } from './pages/SourcesPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { InsightsPage } from './pages/InsightsPage';
 import { AddSpendBottomSheet } from './components/modals/AddSpendBottomSheet';
 import { TransferMoneyBottomSheet } from './components/modals/TransferMoneyBottomSheet';
 import { AddCategoryBottomSheet } from './components/modals/AddCategoryBottomSheet';
@@ -19,6 +21,7 @@ import { Category, MoneySource, Spend, Transfer } from './types/money';
 
 const MainContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('home');
+  const [currentView, setCurrentView] = useState<'tab' | 'insights'>('tab');
 
   // Bottom sheets & modals state
   const [isAddSpendOpen, setIsAddSpendOpen] = useState<boolean>(false);
@@ -32,6 +35,10 @@ const MainContent: React.FC = () => {
   const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null);
 
   const renderActivePage = () => {
+    if (currentView === 'insights') {
+      return <InsightsPage onNavigateBack={() => setCurrentView('tab')} />;
+    }
+
     switch (activeTab) {
       case 'categories':
         return (
@@ -67,9 +74,19 @@ const MainContent: React.FC = () => {
             onSelectCategory={(cat) => setSelectedCategory(cat)}
             onSelectSource={(src) => setSelectedSource(src)}
             onEditSpend={(sp) => setEditingSpend(sp)}
-            onNavigateToHistory={() => setActiveTab('history')}
-            onNavigateToCategories={() => setActiveTab('categories')}
-            onNavigateToSources={() => setActiveTab('sources')}
+            onNavigateToHistory={() => {
+              setCurrentView('tab');
+              setActiveTab('history');
+            }}
+            onNavigateToCategories={() => {
+              setCurrentView('tab');
+              setActiveTab('categories');
+            }}
+            onNavigateToSources={() => {
+              setCurrentView('tab');
+              setActiveTab('sources');
+            }}
+            onNavigateToInsights={() => setCurrentView('insights')}
           />
         );
     }
@@ -82,7 +99,10 @@ const MainContent: React.FC = () => {
       {/* Sticky Bottom Navigation Bar & FAB (+) */}
       <BottomNav
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={(tab) => {
+          setCurrentView('tab');
+          setActiveTab(tab);
+        }}
         onOpenAddSpend={() => setIsAddSpendOpen(true)}
       />
 
@@ -148,7 +168,9 @@ const MainContent: React.FC = () => {
 export default function App() {
   return (
     <MoneyFlowProvider>
-      <MainContent />
+      <PrivacyProvider>
+        <MainContent />
+      </PrivacyProvider>
     </MoneyFlowProvider>
   );
 }

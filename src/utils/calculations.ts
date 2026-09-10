@@ -153,3 +153,32 @@ export const hasSourceTransactions = (
   );
   return hasSpends || hasTransfers;
 };
+
+/**
+ * Calculate total budget across all categories
+ */
+export const getTotalBudget = (categories: Category[]): number => {
+  return categories.reduce((acc, category) => acc + (category.budget || 0), 0);
+};
+
+/**
+ * Calculate total budget remaining = Total Budget - Total Spent
+ */
+export const getTotalBudgetRemaining = (categories: Category[], spends: Spend[]): number => {
+  return getTotalBudget(categories) - getTotalSpent(spends);
+};
+
+/**
+ * Get count of active (incomplete) construction jobs
+ */
+export const getActiveCategoryCount = (categories: Category[]): number => {
+  return categories.filter((c) => !c.isCompleted).length;
+};
+
+/**
+ * Get count of completed construction jobs
+ */
+export const getCompletedCategoryCount = (categories: Category[]): number => {
+  return categories.filter((c) => c.isCompleted).length;
+};
+
