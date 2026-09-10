@@ -32,7 +32,7 @@ export const Toast: React.FC = () => {
   };
 
   return (
-    <div className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none animate-slide-up">
+    <div className="fixed top-24 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none animate-slide-up">
       <div
         className={`max-w-[360px] w-full px-4 py-3 rounded-2xl border backdrop-blur-md shadow-2xl flex items-center justify-between space-x-3 pointer-events-auto ${getBgColor()}`}
       >
