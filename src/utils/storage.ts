@@ -9,24 +9,28 @@ export const INITIAL_SAMPLE_DATA: AppData = {
       id: 'cat-painting',
       name: 'Painting Work',
       budget: 50000,
+      isCompleted: false,
       createdAt: new Date().toISOString(),
     },
     {
       id: 'cat-compound',
       name: 'Compound Wall',
       budget: 100000,
+      isCompleted: false,
       createdAt: new Date().toISOString(),
     },
     {
       id: 'cat-tiling',
       name: 'Tiling',
       budget: 80000,
+      isCompleted: false,
       createdAt: new Date().toISOString(),
     },
     {
       id: 'cat-interlocking',
       name: 'Interlocking',
       budget: 60000,
+      isCompleted: false,
       createdAt: new Date().toISOString(),
     },
   ],
@@ -94,7 +98,7 @@ export const INITIAL_SAMPLE_DATA: AppData = {
 
 /**
  * Load application data from localStorage with fallback to initial sample data
- * Automatically migrates older data missing 'transfers' to transfers: []
+ * Automatically migrates older data missing 'isCompleted' to isCompleted: false
  */
 export const loadAppData = (): AppData => {
   try {
@@ -110,8 +114,14 @@ export const loadAppData = (): AppData => {
       Array.isArray(parsed.sources) &&
       Array.isArray(parsed.spends)
     ) {
+      const migratedCategories: Category[] = parsed.categories.map((c: any) => ({
+        ...c,
+        isCompleted: Boolean(c.isCompleted),
+        completedAt: c.completedAt ? String(c.completedAt) : undefined,
+      }));
+
       const appData: AppData = {
-        categories: parsed.categories,
+        categories: migratedCategories,
         sources: parsed.sources,
         spends: parsed.spends,
         transfers: Array.isArray(parsed.transfers) ? parsed.transfers : [],
@@ -137,7 +147,7 @@ export const saveAppData = (data: AppData): void => {
 };
 
 /**
- * Trigger download of formatted JSON backup file including transfers
+ * Trigger download of formatted JSON backup file including transfers & completion states
  */
 export const exportAppDataAsJSON = (data: AppData): void => {
   const dateStr = getTodayInputDate();
@@ -157,7 +167,7 @@ export const exportAppDataAsJSON = (data: AppData): void => {
 
 /**
  * Validate JSON content before importing to prevent corrupted state
- * Supports legacy backups without 'transfers' field
+ * Supports legacy backups without 'isCompleted' or 'transfers' fields
  */
 export const validateAndImportAppData = (
   jsonString: string
@@ -181,6 +191,8 @@ export const validateAndImportAppData = (
       id: String(c.id || `imported-cat-${index}-${Date.now()}`),
       name: String(c.name || 'Unnamed Category'),
       budget: Number(c.budget) >= 0 ? Number(c.budget) : 0,
+      isCompleted: Boolean(c.isCompleted),
+      completedAt: c.completedAt ? String(c.completedAt) : undefined,
       createdAt: String(c.createdAt || new Date().toISOString()),
     }));
 

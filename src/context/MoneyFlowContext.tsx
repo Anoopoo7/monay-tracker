@@ -27,6 +27,8 @@ interface MoneyFlowContextType {
   addCategory: (name: string, budget: number) => { success: boolean; error?: string };
   updateCategory: (id: string, name: string, budget: number) => { success: boolean; error?: string };
   deleteCategory: (id: string) => { success: boolean; error?: string };
+  markCategoryCompleted: (id: string) => { success: boolean; error?: string };
+  reopenCategory: (id: string) => { success: boolean; error?: string };
   addSource: (name: string, initialAmount: number) => { success: boolean; error?: string };
   updateSource: (id: string, name: string, initialAmount: number) => { success: boolean; error?: string };
   deleteSource: (id: string) => { success: boolean; error?: string };
@@ -116,6 +118,7 @@ export const MoneyFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       id: `cat-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       name: trimmedName,
       budget,
+      isCompleted: false,
       createdAt: new Date().toISOString(),
     };
 
@@ -167,6 +170,44 @@ export const MoneyFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const updatedCategories = data.categories.filter((c) => c.id !== id);
     updateStateAndStorage({ ...data, categories: updatedCategories });
     showToast(`Category "${target.name}" deleted`, 'info');
+    return { success: true };
+  };
+
+  const markCategoryCompleted = (id: string) => {
+    const target = data.categories.find((c) => c.id === id);
+    if (!target) return { success: false, error: 'Category not found' };
+
+    const updatedCategories = data.categories.map((c) =>
+      c.id === id
+        ? {
+            ...c,
+            isCompleted: true,
+            completedAt: new Date().toISOString(),
+          }
+        : c
+    );
+
+    updateStateAndStorage({ ...data, categories: updatedCategories });
+    showToast(`Job "${target.name}" completed ✓`, 'success');
+    return { success: true };
+  };
+
+  const reopenCategory = (id: string) => {
+    const target = data.categories.find((c) => c.id === id);
+    if (!target) return { success: false, error: 'Category not found' };
+
+    const updatedCategories = data.categories.map((c) =>
+      c.id === id
+        ? {
+            ...c,
+            isCompleted: false,
+            completedAt: undefined,
+          }
+        : c
+    );
+
+    updateStateAndStorage({ ...data, categories: updatedCategories });
+    showToast(`Job "${target.name}" reopened`, 'info');
     return { success: true };
   };
 
@@ -544,6 +585,8 @@ export const MoneyFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         addCategory,
         updateCategory,
         deleteCategory,
+        markCategoryCompleted,
+        reopenCategory,
         addSource,
         updateSource,
         deleteSource,

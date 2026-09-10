@@ -2,6 +2,8 @@ export interface Category {
   id: string;
   name: string;
   budget: number;
+  isCompleted: boolean;
+  completedAt?: string;
   createdAt: string;
 }
 

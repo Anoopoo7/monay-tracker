@@ -279,8 +279,13 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ onEditSpend, onEditTra
                     </div>
                     <div>
                       <div className="flex items-center space-x-1.5">
-                        <span className="text-xs font-bold text-white">
-                          ↓ {cat ? cat.name : 'Spend'}
+                        <span className="text-xs font-bold text-white flex items-center space-x-1">
+                          <span>↓ {cat ? cat.name : 'Spend'}</span>
+                          {cat?.isCompleted && (
+                            <span className="text-emerald-400 font-bold text-[10px]" title="Job Completed">
+                              ✓
+                            </span>
+                          )}
                         </span>
                         <span className="px-1.5 py-0.5 bg-slate-800 text-[10px] text-slate-400 font-medium rounded-md border border-slate-700/60">
                           {src ? src.name : 'Source'}

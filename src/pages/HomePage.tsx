@@ -11,7 +11,7 @@ import {
   getTotalSpent,
 } from '../utils/calculations';
 import { formatCurrency, formatDate } from '../utils/formatters';
-import { ArrowUpRight, ChevronRight, Plus, Wallet, AlertTriangle, ArrowRightLeft, Eye, EyeOff } from 'lucide-react';
+import { ArrowUpRight, ChevronRight, Plus, Wallet, AlertTriangle, ArrowRightLeft, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import { Category, MoneySource, Spend } from '../types/money';
 
 interface HomePageProps {
@@ -47,6 +47,8 @@ export const HomePage: React.FC<HomePageProps> = ({
   const totalAvailable = getAvailableMoney(sources, spends);
   const totalAdded = getTotalMoneyAdded(sources);
   const totalSpent = getTotalSpent(spends);
+
+  const activeCategories = categories.filter((c) => !c.isCompleted);
 
   const recentSpends = [...spends]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -172,7 +174,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         )}
       </div>
 
-      {/* Construction Budget Section */}
+      {/* Construction Budget Section - Displays ONLY active jobs */}
       <div className="space-y-2.5">
         <div className="flex items-center justify-between px-0.5">
           <h2 className="text-sm font-bold text-slate-200 tracking-tight">
@@ -194,9 +196,17 @@ export const HomePage: React.FC<HomePageProps> = ({
           >
             <p className="text-xs text-slate-400">Create your first category</p>
           </div>
+        ) : activeCategories.length === 0 ? (
+          <div className="p-4 bg-slate-900/60 border border-slate-800/80 rounded-2xl text-center space-y-1">
+            <div className="text-xs font-bold text-emerald-400 flex items-center justify-center space-x-1">
+              <CheckCircle2 className="w-4 h-4" />
+              <span>All jobs completed</span>
+            </div>
+            <p className="text-[11px] text-slate-500">No active construction jobs</p>
+          </div>
         ) : (
           <div className="space-y-2.5">
-            {categories.map((category) => {
+            {activeCategories.map((category) => {
               const spent = getCategorySpent(category.id, spends);
               const remaining = getCategoryRemaining(category, spends);
               const percentage = getCategoryPercentage(category, spends);

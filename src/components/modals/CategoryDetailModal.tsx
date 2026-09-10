@@ -10,7 +10,7 @@ import {
   getCategoryStatus,
 } from '../../utils/calculations';
 import { formatCurrency, formatDate } from '../../utils/formatters';
-import { AlertCircle, Edit2, Trash2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Edit2, RotateCcw, Trash2 } from 'lucide-react';
 
 interface CategoryDetailModalProps {
   category: Category | null;
@@ -25,12 +25,15 @@ export const CategoryDetailModal: React.FC<CategoryDetailModalProps> = ({
   onClose,
   onEditSpend,
 }) => {
-  const { spends, sources, deleteCategory, updateCategory } = useMoneyFlow();
+  const { spends, sources, deleteCategory, updateCategory, markCategoryCompleted, reopenCategory } =
+    useMoneyFlow();
 
   const [isEditingCategory, setIsEditingCategory] = useState<boolean>(false);
   const [editName, setEditName] = useState<string>('');
   const [editBudget, setEditBudget] = useState<string>('');
   const [actionError, setActionError] = useState<string | null>(null);
+  const [showConfirmComplete, setShowConfirmComplete] = useState<boolean>(false);
+  const [showConfirmReopen, setShowConfirmReopen] = useState<boolean>(false);
 
   if (!category) return null;
 
@@ -99,6 +102,7 @@ export const CategoryDetailModal: React.FC<CategoryDetailModalProps> = ({
   };
 
   const getBarColor = () => {
+    if (category.isCompleted) return 'bg-emerald-600/70';
     if (status === 'exceeded') return 'bg-red-500';
     if (status === 'warning') return 'bg-amber-500';
     return 'bg-emerald-500';
@@ -111,6 +115,92 @@ export const CategoryDetailModal: React.FC<CategoryDetailModalProps> = ({
           <div className="p-3 bg-red-950/90 border border-red-500 text-red-200 rounded-xl text-xs flex items-center space-x-2">
             <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
             <span>{actionError}</span>
+          </div>
+        )}
+
+        {/* Completion Status Header Badge */}
+        {category.isCompleted && (
+          <div className="p-3 bg-emerald-950/70 border border-emerald-800/80 rounded-2xl flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              <div>
+                <div className="text-xs font-bold text-emerald-300">✓ COMPLETED</div>
+                {category.completedAt && (
+                  <div className="text-[10px] text-emerald-400/80">
+                    Completed on {formatDate(category.completedAt)}
+                  </div>
+                )}
+              </div>
+            </div>
+            {!showConfirmReopen && (
+              <button
+                onClick={() => setShowConfirmReopen(true)}
+                className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center space-x-1"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reopen Job</span>
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Confirmation: Mark Completed */}
+        {showConfirmComplete && (
+          <div className="p-4 bg-slate-900 border border-slate-700 rounded-2xl space-y-2.5 animate-slide-up">
+            <div className="text-xs font-bold text-white">Mark job as completed?</div>
+            <div className="text-xs text-slate-300 font-semibold">{category.name}</div>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              This job will no longer appear on the Home screen, but its spending history and summary will remain available.
+            </p>
+            <div className="flex space-x-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  markCategoryCompleted(category.id);
+                  setShowConfirmComplete(false);
+                  onClose();
+                }}
+                className="flex-1 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl transition"
+              >
+                Mark completed
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowConfirmComplete(false)}
+                className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Confirmation: Reopen Job */}
+        {showConfirmReopen && (
+          <div className="p-4 bg-slate-900 border border-slate-700 rounded-2xl space-y-2.5 animate-slide-up">
+            <div className="text-xs font-bold text-white">Reopen this job?</div>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              <strong className="text-slate-200">{category.name}</strong> will appear on the Home screen again.
+            </p>
+            <div className="flex space-x-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  reopenCategory(category.id);
+                  setShowConfirmReopen(false);
+                }}
+                className="flex-1 py-2 bg-blue-500 hover:bg-blue-400 text-white font-bold text-xs rounded-xl transition"
+              >
+                Reopen
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowConfirmReopen(false)}
+                className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         )}
 
@@ -161,7 +251,16 @@ export const CategoryDetailModal: React.FC<CategoryDetailModalProps> = ({
           <div className="p-4 bg-slate-800/60 border border-slate-700/60 rounded-2xl space-y-3">
             <div className="flex items-center justify-between">
               <div>{getStatusBadge()}</div>
-              <div className="flex items-center space-x-1">
+              <div className="flex items-center space-x-1.5">
+                {!category.isCompleted && !showConfirmComplete && (
+                  <button
+                    onClick={() => setShowConfirmComplete(true)}
+                    className="px-2.5 py-1.5 text-xs font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800/80 rounded-xl transition hover:bg-emerald-900/60 flex items-center space-x-1"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Complete</span>
+                  </button>
+                )}
                 <button
                   onClick={handleStartEdit}
                   className="p-2 text-slate-400 hover:text-white bg-slate-700/60 rounded-xl transition"
