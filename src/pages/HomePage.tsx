@@ -11,11 +11,12 @@ import {
   getTotalSpent,
 } from '../utils/calculations';
 import { formatCurrency, formatDate } from '../utils/formatters';
-import { ArrowUpRight, ChevronRight, Plus, Wallet, AlertTriangle } from 'lucide-react';
+import { ArrowUpRight, ChevronRight, Plus, Wallet, AlertTriangle, ArrowRightLeft } from 'lucide-react';
 import { Category, MoneySource, Spend } from '../types/money';
 
 interface HomePageProps {
   onOpenAddSpend: () => void;
+  onOpenTransfer: () => void;
   onOpenAddCategory: () => void;
   onOpenAddSource: () => void;
   onSelectCategory: (category: Category) => void;
@@ -28,6 +29,7 @@ interface HomePageProps {
 
 export const HomePage: React.FC<HomePageProps> = ({
   onOpenAddSpend,
+  onOpenTransfer,
   onOpenAddCategory,
   onOpenAddSource,
   onSelectCategory,
@@ -37,7 +39,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   onNavigateToCategories,
   onNavigateToSources,
 }) => {
-  const { sources, spends, categories } = useMoneyFlow();
+  const { sources, spends, transfers, categories } = useMoneyFlow();
 
   const totalAvailable = getAvailableMoney(sources, spends);
   const totalAdded = getTotalMoneyAdded(sources);
@@ -49,7 +51,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   return (
     <div className="space-y-5">
-      {/* Header */}
+      {/* Header with Dual Quick Action Buttons: + Spend and ↔ Transfer */}
       <div className="flex items-center justify-between pt-1">
         <div>
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
@@ -57,13 +59,22 @@ export const HomePage: React.FC<HomePageProps> = ({
           </span>
           <h1 className="text-xl font-bold text-white tracking-tight">Money Flow</h1>
         </div>
-        <button
-          onClick={onOpenAddSpend}
-          className="flex items-center space-x-1 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-full text-xs font-bold hover:bg-emerald-500/20 transition active:scale-95"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add Spend</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={onOpenTransfer}
+            className="flex items-center space-x-1 px-3 py-1.5 bg-blue-500/10 border border-blue-500/30 text-blue-400 rounded-full text-xs font-bold hover:bg-blue-500/20 transition active:scale-95"
+          >
+            <ArrowRightLeft className="w-3.5 h-3.5" />
+            <span>Transfer</span>
+          </button>
+          <button
+            onClick={onOpenAddSpend}
+            className="flex items-center space-x-1 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-full text-xs font-bold hover:bg-emerald-500/20 transition active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Spend</span>
+          </button>
+        </div>
       </div>
 
       {/* Large Hero Balance Card */}
@@ -124,7 +135,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         ) : (
           <div className="grid grid-cols-2 gap-2.5">
             {sources.map((source) => {
-              const balance = getSourceBalance(source, spends);
+              const balance = getSourceBalance(source, spends, transfers);
               return (
                 <div
                   key={source.id}

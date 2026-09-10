@@ -1,7 +1,7 @@
-import { Category, CategoryStatus, MoneySource, Spend } from '../types/money';
+import { Category, CategoryStatus, MoneySource, Spend, Transfer } from '../types/money';
 
 /**
- * Calculate total money added across all sources
+ * Calculate total money added across all sources (initial amounts)
  */
 export const getTotalMoneyAdded = (sources: MoneySource[]): number => {
   return sources.reduce((acc, source) => acc + (source.initialAmount || 0), 0);
@@ -16,6 +16,7 @@ export const getTotalSpent = (spends: Spend[]): number => {
 
 /**
  * Calculate total available balance = Total Money Added - Total Spent
+ * Note: Transfers do NOT change total available money.
  */
 export const getAvailableMoney = (sources: MoneySource[], spends: Spend[]): number => {
   return getTotalMoneyAdded(sources) - getTotalSpent(spends);
@@ -31,10 +32,37 @@ export const getSourceSpent = (sourceId: string, spends: Spend[]): number => {
 };
 
 /**
- * Calculate current available balance for a specific source
+ * Calculate total money transferred IN to a source
  */
-export const getSourceBalance = (source: MoneySource, spends: Spend[]): number => {
-  return (source.initialAmount || 0) - getSourceSpent(source.id, spends);
+export const getSourceTransferredIn = (sourceId: string, transfers: Transfer[] = []): number => {
+  return transfers
+    .filter((t) => t.toSourceId === sourceId)
+    .reduce((acc, t) => acc + (t.amount || 0), 0);
+};
+
+/**
+ * Calculate total money transferred OUT from a source
+ */
+export const getSourceTransferredOut = (sourceId: string, transfers: Transfer[] = []): number => {
+  return transfers
+    .filter((t) => t.fromSourceId === sourceId)
+    .reduce((acc, t) => acc + (t.amount || 0), 0);
+};
+
+/**
+ * Calculate current available balance for a specific source:
+ * initialAmount + transferredIn - transferredOut - spent
+ */
+export const getSourceBalance = (
+  source: MoneySource,
+  spends: Spend[],
+  transfers: Transfer[] = []
+): number => {
+  const initial = source.initialAmount || 0;
+  const inAmount = getSourceTransferredIn(source.id, transfers);
+  const outAmount = getSourceTransferredOut(source.id, transfers);
+  const spent = getSourceSpent(source.id, spends);
+  return initial + inAmount - outAmount - spent;
 };
 
 /**
@@ -96,6 +124,15 @@ export const getSourceSpends = (sourceId: string, spends: Spend[]): Spend[] => {
 };
 
 /**
+ * Get all transfers involving a specific source (either from or to), sorted newest first
+ */
+export const getSourceTransfers = (sourceId: string, transfers: Transfer[] = []): Transfer[] => {
+  return transfers
+    .filter((t) => t.fromSourceId === sourceId || t.toSourceId === sourceId)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+};
+
+/**
  * Check if a category has any existing spending transactions
  */
 export const hasCategoryTransactions = (categoryId: string, spends: Spend[]): boolean => {
@@ -103,8 +140,16 @@ export const hasCategoryTransactions = (categoryId: string, spends: Spend[]): bo
 };
 
 /**
- * Check if a source has any existing spending transactions
+ * Check if a source has any existing spending transactions or transfers
  */
-export const hasSourceTransactions = (sourceId: string, spends: Spend[]): boolean => {
-  return spends.some((spend) => spend.sourceId === sourceId);
+export const hasSourceTransactions = (
+  sourceId: string,
+  spends: Spend[],
+  transfers: Transfer[] = []
+): boolean => {
+  const hasSpends = spends.some((spend) => spend.sourceId === sourceId);
+  const hasTransfers = transfers.some(
+    (t) => t.fromSourceId === sourceId || t.toSourceId === sourceId
+  );
+  return hasSpends || hasTransfers;
 };

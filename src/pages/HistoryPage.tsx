@@ -1,29 +1,32 @@
 import React, { useState } from 'react';
 import { useMoneyFlow } from '../context/MoneyFlowContext';
 import { formatCurrency, formatDate } from '../utils/formatters';
-import { Filter, Search, X } from 'lucide-react';
-import { Spend } from '../types/money';
+import { ArrowRightLeft, ArrowUpRight, Filter, Search, X } from 'lucide-react';
+import { Spend, Transfer } from '../types/money';
 import { FilterBottomSheet } from '../components/modals/FilterBottomSheet';
 
 interface HistoryPageProps {
   onEditSpend: (spend: Spend) => void;
+  onEditTransfer: (transfer: Transfer) => void;
 }
 
-export const HistoryPage: React.FC<HistoryPageProps> = ({ onEditSpend }) => {
-  const { spends, categories, sources } = useMoneyFlow();
+export const HistoryPage: React.FC<HistoryPageProps> = ({ onEditSpend, onEditTransfer }) => {
+  const { spends, transfers, categories, sources } = useMoneyFlow();
 
   const [searchText, setSearchText] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedSource, setSelectedSource] = useState<string>('');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'spends' | 'transfers'>('all');
   const [isFilterOpen, setIsFilterOpen] = useState<boolean>(false);
 
   const activeFiltersCount =
     (selectedCategory ? 1 : 0) +
     (selectedSource ? 1 : 0) +
     (startDate ? 1 : 0) +
-    (endDate ? 1 : 0);
+    (endDate ? 1 : 0) +
+    (typeFilter !== 'all' ? 1 : 0);
 
   const handleResetFilters = () => {
     setSelectedCategory('');
@@ -31,45 +34,98 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ onEditSpend }) => {
     setStartDate('');
     setEndDate('');
     setSearchText('');
+    setTypeFilter('all');
   };
 
-  // Filter and sort transactions
-  const filteredSpends = spends
-    .filter((sp) => {
-      if (selectedCategory && sp.categoryId !== selectedCategory) return false;
-      if (selectedSource && sp.sourceId !== selectedSource) return false;
+  type HistoryItem =
+    | { type: 'spend'; data: Spend; timestamp: number }
+    | { type: 'transfer'; data: Transfer; timestamp: number };
 
-      if (startDate && new Date(sp.date) < new Date(startDate)) return false;
-      if (endDate && new Date(sp.date) > new Date(endDate)) return false;
+  const combinedItems: HistoryItem[] = [
+    ...(typeFilter === 'transfers'
+      ? []
+      : spends.map((s) => ({
+          type: 'spend' as const,
+          data: s,
+          timestamp: new Date(s.date).getTime(),
+        }))),
+    ...(typeFilter === 'spends'
+      ? []
+      : transfers.map((t) => ({
+          type: 'transfer' as const,
+          data: t,
+          timestamp: new Date(t.date).getTime(),
+        }))),
+  ];
 
-      if (searchText.trim()) {
-        const query = searchText.toLowerCase().trim();
-        const cat = categories.find((c) => c.id === sp.categoryId);
-        const src = sources.find((s) => s.id === sp.sourceId);
-        const catName = cat ? cat.name.toLowerCase() : '';
-        const srcName = src ? src.name.toLowerCase() : '';
-        const note = sp.note ? sp.note.toLowerCase() : '';
-        const amountStr = sp.amount.toString();
+  const filteredItems = combinedItems
+    .filter((item) => {
+      if (item.type === 'spend') {
+        const sp = item.data;
+        if (selectedCategory && sp.categoryId !== selectedCategory) return false;
+        if (selectedSource && sp.sourceId !== selectedSource) return false;
+        if (startDate && new Date(sp.date) < new Date(startDate)) return false;
+        if (endDate && new Date(sp.date) > new Date(endDate)) return false;
 
-        return (
-          catName.includes(query) ||
-          srcName.includes(query) ||
-          note.includes(query) ||
-          amountStr.includes(query)
-        );
+        if (searchText.trim()) {
+          const query = searchText.toLowerCase().trim();
+          const cat = categories.find((c) => c.id === sp.categoryId);
+          const src = sources.find((s) => s.id === sp.sourceId);
+          const catName = cat ? cat.name.toLowerCase() : '';
+          const srcName = src ? src.name.toLowerCase() : '';
+          const note = sp.note ? sp.note.toLowerCase() : '';
+          const amountStr = sp.amount.toString();
+
+          return (
+            catName.includes(query) ||
+            srcName.includes(query) ||
+            note.includes(query) ||
+            amountStr.includes(query)
+          );
+        }
+      } else if (item.type === 'transfer') {
+        const tr = item.data;
+        // If category filter is selected, transfers don't belong to categories
+        if (selectedCategory) return false;
+        if (
+          selectedSource &&
+          tr.fromSourceId !== selectedSource &&
+          tr.toSourceId !== selectedSource
+        ) {
+          return false;
+        }
+        if (startDate && new Date(tr.date) < new Date(startDate)) return false;
+        if (endDate && new Date(tr.date) > new Date(endDate)) return false;
+
+        if (searchText.trim()) {
+          const query = searchText.toLowerCase().trim();
+          const fromSrc = sources.find((s) => s.id === tr.fromSourceId);
+          const toSrc = sources.find((s) => s.id === tr.toSourceId);
+          const fromName = fromSrc ? fromSrc.name.toLowerCase() : '';
+          const toName = toSrc ? toSrc.name.toLowerCase() : '';
+          const note = tr.note ? tr.note.toLowerCase() : '';
+          const amountStr = tr.amount.toString();
+
+          return (
+            fromName.includes(query) ||
+            toName.includes(query) ||
+            note.includes(query) ||
+            amountStr.includes(query) ||
+            'transfer'.includes(query)
+          );
+        }
       }
-
       return true;
     })
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    .sort((a, b) => b.timestamp - a.timestamp);
 
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between pt-1">
         <div>
-          <h1 className="text-xl font-bold text-white tracking-tight">Spending History</h1>
-          <p className="text-xs text-slate-400">Complete transaction records</p>
+          <h1 className="text-xl font-bold text-white tracking-tight">History</h1>
+          <p className="text-xs text-slate-400">Spending & money transfers</p>
         </div>
         <button
           onClick={() => setIsFilterOpen(true)}
@@ -89,12 +145,46 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ onEditSpend }) => {
         </button>
       </div>
 
+      {/* Type Segment Controller (All | Spends | Transfers) */}
+      <div className="grid grid-cols-3 gap-1 p-1 bg-slate-900 border border-slate-800 rounded-xl">
+        <button
+          onClick={() => setTypeFilter('all')}
+          className={`py-1.5 text-xs font-semibold rounded-lg transition ${
+            typeFilter === 'all'
+              ? 'bg-slate-800 text-white shadow-sm'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          All
+        </button>
+        <button
+          onClick={() => setTypeFilter('spends')}
+          className={`py-1.5 text-xs font-semibold rounded-lg transition ${
+            typeFilter === 'spends'
+              ? 'bg-slate-800 text-emerald-400 shadow-sm'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          Spends
+        </button>
+        <button
+          onClick={() => setTypeFilter('transfers')}
+          className={`py-1.5 text-xs font-semibold rounded-lg transition ${
+            typeFilter === 'transfers'
+              ? 'bg-slate-800 text-blue-400 shadow-sm'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          Transfers
+        </button>
+      </div>
+
       {/* Search Input */}
       <div className="relative">
         <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
         <input
           type="text"
-          placeholder="Search by category, source, note..."
+          placeholder="Search note, category, source, amount..."
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
           className="w-full pl-9 pr-8 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-emerald-500 transition"
@@ -152,10 +242,10 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ onEditSpend }) => {
         </div>
       )}
 
-      {/* Spending Transactions List */}
-      {filteredSpends.length === 0 ? (
+      {/* Combined History List */}
+      {filteredItems.length === 0 ? (
         <div className="p-8 bg-slate-900/60 border border-slate-800 rounded-3xl text-center space-y-2">
-          <p className="text-xs text-slate-400 font-medium">No spending transactions found</p>
+          <p className="text-xs text-slate-400 font-medium">No history records found</p>
           {activeFiltersCount > 0 || searchText ? (
             <button
               onClick={handleResetFilters}
@@ -164,40 +254,82 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ onEditSpend }) => {
               Reset filters & search
             </button>
           ) : (
-            <p className="text-[11px] text-slate-500">Tap + to add your first expense</p>
+            <p className="text-[11px] text-slate-500">
+              Record a spend or transfer to view history
+            </p>
           )}
         </div>
       ) : (
         <div className="space-y-2">
-          {filteredSpends.map((sp) => {
-            const cat = categories.find((c) => c.id === sp.categoryId);
-            const src = sources.find((s) => s.id === sp.sourceId);
+          {filteredItems.map((item, idx) => {
+            if (item.type === 'spend') {
+              const sp = item.data;
+              const cat = categories.find((c) => c.id === sp.categoryId);
+              const src = sources.find((s) => s.id === sp.sourceId);
 
-            return (
-              <div
-                key={sp.id}
-                onClick={() => onEditSpend(sp)}
-                className="p-3.5 bg-slate-900/90 border border-slate-800 hover:border-slate-700 rounded-2xl flex items-center justify-between transition cursor-pointer active:scale-[0.99]"
-              >
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs font-bold text-white">
-                      {cat ? cat.name : 'Unknown Category'}
-                    </span>
-                    <span className="px-2 py-0.5 bg-slate-800 text-[10px] text-slate-400 font-medium rounded-md border border-slate-700/60">
-                      {src ? src.name : 'Unknown Source'}
-                    </span>
+              return (
+                <div
+                  key={`spend-${sp.id}-${idx}`}
+                  onClick={() => onEditSpend(sp)}
+                  className="p-3.5 bg-slate-900/90 border border-slate-800 hover:border-slate-700 rounded-2xl flex items-center justify-between transition cursor-pointer active:scale-[0.99]"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                      <ArrowUpRight className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center space-x-1.5">
+                        <span className="text-xs font-bold text-white">
+                          ↓ {cat ? cat.name : 'Spend'}
+                        </span>
+                        <span className="px-1.5 py-0.5 bg-slate-800 text-[10px] text-slate-400 font-medium rounded-md border border-slate-700/60">
+                          {src ? src.name : 'Source'}
+                        </span>
+                      </div>
+                      {sp.note && (
+                        <div className="text-xs text-slate-300 mt-0.5">{sp.note}</div>
+                      )}
+                      <div className="text-[11px] text-slate-400 mt-0.5">{formatDate(sp.date)}</div>
+                    </div>
                   </div>
-                  {sp.note && (
-                    <div className="text-xs text-slate-300 mt-0.5">{sp.note}</div>
-                  )}
-                  <div className="text-[11px] text-slate-400 mt-1">{formatDate(sp.date)}</div>
+                  <div className="text-sm font-extrabold text-amber-400 text-right">
+                    {formatCurrency(sp.amount)}
+                  </div>
                 </div>
-                <div className="text-sm font-extrabold text-white text-right">
-                  {formatCurrency(sp.amount)}
+              );
+            } else {
+              const tr = item.data;
+              const fromSrc = sources.find((s) => s.id === tr.fromSourceId);
+              const toSrc = sources.find((s) => s.id === tr.toSourceId);
+
+              return (
+                <div
+                  key={`transfer-${tr.id}-${idx}`}
+                  onClick={() => onEditTransfer(tr)}
+                  className="p-3.5 bg-slate-900/90 border border-slate-800 hover:border-slate-700 rounded-2xl flex items-center justify-between transition cursor-pointer active:scale-[0.99]"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+                      <ArrowRightLeft className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-white flex items-center space-x-1">
+                        <span>↔ {fromSrc ? fromSrc.name : 'Source'}</span>
+                        <span className="text-blue-400 font-bold">→</span>
+                        <span>{toSrc ? toSrc.name : 'Destination'}</span>
+                      </div>
+                      {tr.note && (
+                        <div className="text-xs text-slate-300 mt-0.5">{tr.note}</div>
+                      )}
+                      <div className="text-[11px] text-slate-400 mt-0.5">{formatDate(tr.date)}</div>
+                    </div>
+                  </div>
+                  <div className="text-sm font-extrabold text-blue-400 text-right">
+                    {formatCurrency(tr.amount)}
+                  </div>
                 </div>
-              </div>
-            );
+              );
+            }
           })}
         </div>
       )}

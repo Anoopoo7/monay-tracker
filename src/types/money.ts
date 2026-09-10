@@ -36,7 +36,7 @@ export interface AppData {
   categories: Category[];
   sources: MoneySource[];
   spends: Spend[];
-  transfers?: Transfer[];
+  transfers: Transfer[];
 }
 
 export type CategoryStatus = 'normal' | 'warning' | 'exceeded';

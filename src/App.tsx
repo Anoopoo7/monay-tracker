@@ -8,24 +8,28 @@ import { SourcesPage } from './pages/SourcesPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { AddSpendBottomSheet } from './components/modals/AddSpendBottomSheet';
+import { TransferMoneyBottomSheet } from './components/modals/TransferMoneyBottomSheet';
 import { AddCategoryBottomSheet } from './components/modals/AddCategoryBottomSheet';
 import { AddSourceBottomSheet } from './components/modals/AddSourceBottomSheet';
 import { CategoryDetailModal } from './components/modals/CategoryDetailModal';
 import { SourceDetailModal } from './components/modals/SourceDetailModal';
 import { EditSpendBottomSheet } from './components/modals/EditSpendBottomSheet';
-import { Category, MoneySource, Spend } from './types/money';
+import { EditTransferBottomSheet } from './components/modals/EditTransferBottomSheet';
+import { Category, MoneySource, Spend, Transfer } from './types/money';
 
 const MainContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('home');
 
   // Bottom sheets & modals state
   const [isAddSpendOpen, setIsAddSpendOpen] = useState<boolean>(false);
+  const [isTransferOpen, setIsTransferOpen] = useState<boolean>(false);
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState<boolean>(false);
   const [isAddSourceOpen, setIsAddSourceOpen] = useState<boolean>(false);
 
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [selectedSource, setSelectedSource] = useState<MoneySource | null>(null);
   const [editingSpend, setEditingSpend] = useState<Spend | null>(null);
+  const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null);
 
   const renderActivePage = () => {
     switch (activeTab) {
@@ -44,7 +48,12 @@ const MainContent: React.FC = () => {
           />
         );
       case 'history':
-        return <HistoryPage onEditSpend={(sp) => setEditingSpend(sp)} />;
+        return (
+          <HistoryPage
+            onEditSpend={(sp) => setEditingSpend(sp)}
+            onEditTransfer={(tr) => setEditingTransfer(tr)}
+          />
+        );
       case 'settings':
         return <SettingsPage />;
       case 'home':
@@ -52,6 +61,7 @@ const MainContent: React.FC = () => {
         return (
           <HomePage
             onOpenAddSpend={() => setIsAddSpendOpen(true)}
+            onOpenTransfer={() => setIsTransferOpen(true)}
             onOpenAddCategory={() => setIsAddCategoryOpen(true)}
             onOpenAddSource={() => setIsAddSourceOpen(true)}
             onSelectCategory={(cat) => setSelectedCategory(cat)}
@@ -82,6 +92,11 @@ const MainContent: React.FC = () => {
         onClose={() => setIsAddSpendOpen(false)}
       />
 
+      <TransferMoneyBottomSheet
+        isOpen={isTransferOpen}
+        onClose={() => setIsTransferOpen(false)}
+      />
+
       <AddCategoryBottomSheet
         isOpen={isAddCategoryOpen}
         onClose={() => setIsAddCategoryOpen(false)}
@@ -98,7 +113,6 @@ const MainContent: React.FC = () => {
         onClose={() => setSelectedCategory(null)}
         onEditSpend={(spendId) => {
           setSelectedCategory(null);
-          // Find spend
         }}
       />
 
@@ -106,8 +120,13 @@ const MainContent: React.FC = () => {
         source={selectedSource}
         isOpen={!!selectedSource}
         onClose={() => setSelectedSource(null)}
-        onEditSpend={(spendId) => {
+        onEditSpend={(spend) => {
           setSelectedSource(null);
+          setEditingSpend(spend);
+        }}
+        onEditTransfer={(transfer) => {
+          setSelectedSource(null);
+          setEditingTransfer(transfer);
         }}
       />
 
@@ -115,6 +134,12 @@ const MainContent: React.FC = () => {
         spend={editingSpend}
         isOpen={!!editingSpend}
         onClose={() => setEditingSpend(null)}
+      />
+
+      <EditTransferBottomSheet
+        transfer={editingTransfer}
+        isOpen={!!editingTransfer}
+        onClose={() => setEditingTransfer(null)}
       />
     </MobileShell>
   );

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { AppData, Category, MoneySource, Spend } from '../types/money';
+import { AppData, Category, MoneySource, Spend, Transfer } from '../types/money';
 import { getSourceBalance, hasCategoryTransactions, hasSourceTransactions } from '../utils/calculations';
 import {
   clearAllData,
@@ -20,6 +20,7 @@ interface MoneyFlowContextType {
   categories: Category[];
   sources: MoneySource[];
   spends: Spend[];
+  transfers: Transfer[];
   toast: ToastState | null;
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   hideToast: () => void;
@@ -45,6 +46,22 @@ interface MoneyFlowContextType {
     note?: string
   ) => { success: boolean; error?: string };
   deleteSpend: (id: string) => void;
+  addTransfer: (
+    fromSourceId: string,
+    toSourceId: string,
+    amount: number,
+    date: string,
+    note?: string
+  ) => { success: boolean; error?: string };
+  updateTransfer: (
+    id: string,
+    fromSourceId: string,
+    toSourceId: string,
+    amount: number,
+    date: string,
+    note?: string
+  ) => { success: boolean; error?: string };
+  deleteTransfer: (id: string) => void;
   exportData: () => void;
   importData: (jsonString: string) => { success: boolean; error?: string };
   resetData: () => void;
@@ -214,10 +231,10 @@ export const MoneyFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const target = data.sources.find((s) => s.id === id);
     if (!target) return { success: false, error: 'Money source not found' };
 
-    if (hasSourceTransactions(id, data.spends)) {
+    if (hasSourceTransactions(id, data.spends, data.transfers)) {
       return {
         success: false,
-        error: `Cannot delete "${target.name}" because it has existing spending transactions.`,
+        error: `Cannot delete "${target.name}" because it has existing transactions or transfers.`,
       };
     }
 
@@ -253,13 +270,13 @@ export const MoneyFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return { success: false, error: 'Selected money source not found' };
     }
 
-    // Check available source balance
-    const availableBalance = getSourceBalance(source, data.spends);
+    // Check available source balance (incorporating transfers!)
+    const availableBalance = getSourceBalance(source, data.spends, data.transfers);
     if (amount > availableBalance) {
       const formattedBalance = new Intl.NumberFormat('en-IN').format(availableBalance);
       return {
         success: false,
-        error: `Insufficient balance in ${source.name}. Available balance is ₹${formattedBalance}.`,
+        error: `Insufficient balance. ${source.name} has only ₹${formattedBalance} available.`,
       };
     }
 
@@ -314,16 +331,15 @@ export const MoneyFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return { success: false, error: 'Selected money source not found' };
     }
 
-    // If staying in same source, add back the old amount before checking
-    const rawAvailable = getSourceBalance(source, data.spends);
-    const availableBalanceForUpdate =
-      existingSpend.sourceId === sourceId ? rawAvailable + existingSpend.amount : rawAvailable;
+    // Evaluate available balance excluding existing spend being edited
+    const spendsWithoutCurrent = data.spends.filter((s) => s.id !== id);
+    const availableBalanceForUpdate = getSourceBalance(source, spendsWithoutCurrent, data.transfers);
 
     if (amount > availableBalanceForUpdate) {
       const formattedBalance = new Intl.NumberFormat('en-IN').format(availableBalanceForUpdate);
       return {
         success: false,
-        error: `Insufficient balance in ${source.name}. Available balance is ₹${formattedBalance}.`,
+        error: `Insufficient balance. ${source.name} has only ₹${formattedBalance} available.`,
       };
     }
 
@@ -349,6 +365,140 @@ export const MoneyFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const updatedSpends = data.spends.filter((s) => s.id !== id);
     updateStateAndStorage({ ...data, spends: updatedSpends });
     showToast(`Spend transaction deleted`, 'info');
+  };
+
+  // TRANSFERS
+  const addTransfer = (
+    fromSourceId: string,
+    toSourceId: string,
+    amount: number,
+    date: string,
+    note?: string
+  ) => {
+    if (isNaN(amount) || amount <= 0) {
+      return { success: false, error: 'Amount must be greater than 0' };
+    }
+    if (!fromSourceId) {
+      return { success: false, error: 'From source is required' };
+    }
+    if (!toSourceId) {
+      return { success: false, error: 'To source is required' };
+    }
+    if (fromSourceId === toSourceId) {
+      return { success: false, error: 'Source and destination must be different.' };
+    }
+    if (!date) {
+      return { success: false, error: 'Date is required' };
+    }
+
+    const fromSource = data.sources.find((s) => s.id === fromSourceId);
+    if (!fromSource) {
+      return { success: false, error: 'From money source not found' };
+    }
+
+    const toSource = data.sources.find((s) => s.id === toSourceId);
+    if (!toSource) {
+      return { success: false, error: 'To money source not found' };
+    }
+
+    // Validate available balance in fromSource
+    const availableBalance = getSourceBalance(fromSource, data.spends, data.transfers);
+    if (amount > availableBalance) {
+      const formattedBalance = new Intl.NumberFormat('en-IN').format(availableBalance);
+      return {
+        success: false,
+        error: `Insufficient balance. ${fromSource.name} has only ₹${formattedBalance} available.`,
+      };
+    }
+
+    const newTransfer: Transfer = {
+      id: `transfer-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      fromSourceId,
+      toSourceId,
+      amount,
+      date,
+      note: note?.trim() || undefined,
+      createdAt: new Date().toISOString(),
+    };
+
+    const updatedData: AppData = {
+      ...data,
+      transfers: [newTransfer, ...data.transfers],
+    };
+
+    updateStateAndStorage(updatedData);
+    showToast(`Transfer recorded successfully`, 'success');
+    return { success: true };
+  };
+
+  const updateTransfer = (
+    id: string,
+    fromSourceId: string,
+    toSourceId: string,
+    amount: number,
+    date: string,
+    note?: string
+  ) => {
+    if (isNaN(amount) || amount <= 0) {
+      return { success: false, error: 'Amount must be greater than 0' };
+    }
+    if (!fromSourceId) {
+      return { success: false, error: 'From source is required' };
+    }
+    if (!toSourceId) {
+      return { success: false, error: 'To source is required' };
+    }
+    if (fromSourceId === toSourceId) {
+      return { success: false, error: 'Source and destination must be different.' };
+    }
+    if (!date) {
+      return { success: false, error: 'Date is required' };
+    }
+
+    const existingTransfer = data.transfers.find((t) => t.id === id);
+    if (!existingTransfer) {
+      return { success: false, error: 'Transfer transaction not found' };
+    }
+
+    const fromSource = data.sources.find((s) => s.id === fromSourceId);
+    if (!fromSource) {
+      return { success: false, error: 'From money source not found' };
+    }
+
+    // Evaluate available balance excluding the current transfer being edited
+    const transfersWithoutCurrent = data.transfers.filter((t) => t.id !== id);
+    const availableBalanceForUpdate = getSourceBalance(fromSource, data.spends, transfersWithoutCurrent);
+
+    if (amount > availableBalanceForUpdate) {
+      const formattedBalance = new Intl.NumberFormat('en-IN').format(availableBalanceForUpdate);
+      return {
+        success: false,
+        error: `Insufficient balance. ${fromSource.name} has only ₹${formattedBalance} available.`,
+      };
+    }
+
+    const updatedTransfers = data.transfers.map((t) =>
+      t.id === id
+        ? {
+            ...t,
+            fromSourceId,
+            toSourceId,
+            amount,
+            date,
+            note: note?.trim() || undefined,
+          }
+        : t
+    );
+
+    updateStateAndStorage({ ...data, transfers: updatedTransfers });
+    showToast(`Transfer transaction updated`, 'success');
+    return { success: true };
+  };
+
+  const deleteTransfer = (id: string) => {
+    const updatedTransfers = data.transfers.filter((t) => t.id !== id);
+    updateStateAndStorage({ ...data, transfers: updatedTransfers });
+    showToast(`Transfer transaction deleted`, 'info');
   };
 
   // BACKUP & RESTORE
@@ -387,6 +537,7 @@ export const MoneyFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         categories: data.categories,
         sources: data.sources,
         spends: data.spends,
+        transfers: data.transfers,
         toast,
         showToast,
         hideToast,
@@ -399,6 +550,9 @@ export const MoneyFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         addSpend,
         updateSpend,
         deleteSpend,
+        addTransfer,
+        updateTransfer,
+        deleteTransfer,
         exportData,
         importData,
         resetData,

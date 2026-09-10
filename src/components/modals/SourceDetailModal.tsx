@@ -1,16 +1,22 @@
 import React, { useState } from 'react';
-import { MoneySource } from '../../types/money';
+import { MoneySource, Spend, Transfer } from '../../types/money';
 import { useMoneyFlow } from '../../context/MoneyFlowContext';
 import { BottomSheet } from '../common/BottomSheet';
-import { getSourceBalance, getSourceSpent, getSourceSpends } from '../../utils/calculations';
+import {
+  getSourceBalance,
+  getSourceSpent,
+  getSourceTransferredIn,
+  getSourceTransferredOut,
+} from '../../utils/calculations';
 import { formatCurrency, formatDate } from '../../utils/formatters';
-import { AlertCircle, Edit2, Trash2 } from 'lucide-react';
+import { AlertCircle, ArrowDownLeft, ArrowUpRight, Edit2, MoveRight, Trash2 } from 'lucide-react';
 
 interface SourceDetailModalProps {
   source: MoneySource | null;
   isOpen: boolean;
   onClose: () => void;
-  onEditSpend?: (spendId: string) => void;
+  onEditSpend?: (spend: Spend) => void;
+  onEditTransfer?: (transfer: Transfer) => void;
 }
 
 export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
@@ -18,8 +24,9 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
   isOpen,
   onClose,
   onEditSpend,
+  onEditTransfer,
 }) => {
-  const { spends, categories, deleteSource, updateSource } = useMoneyFlow();
+  const { spends, transfers, sources, categories, deleteSource, updateSource } = useMoneyFlow();
 
   const [isEditingSource, setIsEditingSource] = useState<boolean>(false);
   const [editName, setEditName] = useState<string>('');
@@ -29,8 +36,33 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
   if (!source) return null;
 
   const spent = getSourceSpent(source.id, spends);
-  const available = getSourceBalance(source, spends);
-  const sourceSpends = getSourceSpends(source.id, spends);
+  const transferredIn = getSourceTransferredIn(source.id, transfers);
+  const transferredOut = getSourceTransferredOut(source.id, transfers);
+  const available = getSourceBalance(source, spends, transfers);
+
+  // Combine spends and transfers for this source
+  const sourceSpends = spends.filter((s) => s.sourceId === source.id);
+  const sourceTransfers = transfers.filter(
+    (t) => t.fromSourceId === source.id || t.toSourceId === source.id
+  );
+
+  type CombinedItem =
+    | { type: 'spend'; data: Spend; timestamp: number }
+    | { type: 'transfer_out'; data: Transfer; timestamp: number }
+    | { type: 'transfer_in'; data: Transfer; timestamp: number };
+
+  const combinedHistory: CombinedItem[] = [
+    ...sourceSpends.map((s) => ({
+      type: 'spend' as const,
+      data: s,
+      timestamp: new Date(s.date).getTime(),
+    })),
+    ...sourceTransfers.map((t) => ({
+      type: t.fromSourceId === source.id ? ('transfer_out' as const) : ('transfer_in' as const),
+      data: t,
+      timestamp: new Date(t.date).getTime(),
+    })),
+  ].sort((a, b) => b.timestamp - a.timestamp);
 
   const handleStartEdit = () => {
     setEditName(source.name);
@@ -151,15 +183,27 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
 
             <div className="grid grid-cols-2 gap-2 text-center pt-1">
               <div className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
-                <span className="text-[10px] text-slate-400 block uppercase">Starting Money</span>
-                <span className="text-sm font-semibold text-white">
+                <span className="text-[10px] text-slate-400 block uppercase">Money Added</span>
+                <span className="text-xs font-semibold text-white">
                   {formatCurrency(source.initialAmount)}
                 </span>
               </div>
               <div className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
-                <span className="text-[10px] text-slate-400 block uppercase">Total Spent</span>
-                <span className="text-sm font-semibold text-amber-400">
+                <span className="text-[10px] text-slate-400 block uppercase">Spent</span>
+                <span className="text-xs font-semibold text-amber-400">
                   {formatCurrency(spent)}
+                </span>
+              </div>
+              <div className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
+                <span className="text-[10px] text-slate-400 block uppercase">Transferred Out</span>
+                <span className="text-xs font-semibold text-blue-400">
+                  {formatCurrency(transferredOut)}
+                </span>
+              </div>
+              <div className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
+                <span className="text-[10px] text-slate-400 block uppercase">Transferred In</span>
+                <span className="text-xs font-semibold text-emerald-400">
+                  {formatCurrency(transferredIn)}
                 </span>
               </div>
             </div>
@@ -169,35 +213,94 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
         {/* Transactions List */}
         <div>
           <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-            Transactions ({sourceSpends.length})
+            History ({combinedHistory.length})
           </h4>
-          {sourceSpends.length === 0 ? (
+          {combinedHistory.length === 0 ? (
             <div className="p-4 text-center text-xs text-slate-500 bg-slate-800/30 rounded-2xl border border-slate-800">
-              No transactions made using this source yet
+              No transactions recorded for this source yet
             </div>
           ) : (
             <div className="space-y-2">
-              {sourceSpends.map((sp) => {
-                const cat = categories.find((c) => c.id === sp.categoryId);
-                return (
-                  <div
-                    key={sp.id}
-                    onClick={() => onEditSpend && onEditSpend(sp.id)}
-                    className="p-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-800/80 rounded-xl flex items-center justify-between transition cursor-pointer active:scale-[0.99]"
-                  >
-                    <div>
-                      <div className="text-xs font-medium text-white">
-                        {cat ? cat.name : 'Unknown Category'}
+              {combinedHistory.map((item, idx) => {
+                if (item.type === 'spend') {
+                  const cat = categories.find((c) => c.id === item.data.categoryId);
+                  return (
+                    <div
+                      key={`spend-${item.data.id}-${idx}`}
+                      onClick={() => onEditSpend && onEditSpend(item.data)}
+                      className="p-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-800/80 rounded-xl flex items-center justify-between transition cursor-pointer active:scale-[0.99]"
+                    >
+                      <div className="flex items-center space-x-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                          <ArrowUpRight className="w-3.5 h-3.5" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-medium text-white">
+                            ↓ {cat ? cat.name : 'Spend'}
+                          </div>
+                          <div className="text-[11px] text-slate-400">
+                            {item.data.note || 'No note'} · {formatDate(item.data.date)}
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-[11px] text-slate-400">
-                        {sp.note || 'No note'} · {formatDate(sp.date)}
+                      <div className="text-xs font-bold text-amber-400">
+                        -{formatCurrency(item.data.amount)}
                       </div>
                     </div>
-                    <div className="text-sm font-bold text-slate-100">
-                      {formatCurrency(sp.amount)}
+                  );
+                } else if (item.type === 'transfer_out') {
+                  const targetSrc = sources.find((s) => s.id === item.data.toSourceId);
+                  return (
+                    <div
+                      key={`transfer-out-${item.data.id}-${idx}`}
+                      onClick={() => onEditTransfer && onEditTransfer(item.data)}
+                      className="p-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-800/80 rounded-xl flex items-center justify-between transition cursor-pointer active:scale-[0.99]"
+                    >
+                      <div className="flex items-center space-x-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+                          <MoveRight className="w-3.5 h-3.5" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-medium text-white">
+                            ↗ Transfer to {targetSrc ? targetSrc.name : 'Source'}
+                          </div>
+                          <div className="text-[11px] text-slate-400">
+                            {item.data.note || 'Transfer'} · {formatDate(item.data.date)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-xs font-bold text-blue-400">
+                        -{formatCurrency(item.data.amount)}
+                      </div>
                     </div>
-                  </div>
-                );
+                  );
+                } else {
+                  const fromSrc = sources.find((s) => s.id === item.data.fromSourceId);
+                  return (
+                    <div
+                      key={`transfer-in-${item.data.id}-${idx}`}
+                      onClick={() => onEditTransfer && onEditTransfer(item.data)}
+                      className="p-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-800/80 rounded-xl flex items-center justify-between transition cursor-pointer active:scale-[0.99]"
+                    >
+                      <div className="flex items-center space-x-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                          <ArrowDownLeft className="w-3.5 h-3.5" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-medium text-white">
+                            ↙ Transfer from {fromSrc ? fromSrc.name : 'Source'}
+                          </div>
+                          <div className="text-[11px] text-slate-400">
+                            {item.data.note || 'Transfer'} · {formatDate(item.data.date)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-xs font-bold text-emerald-400">
+                        +{formatCurrency(item.data.amount)}
+                      </div>
+                    </div>
+                  );
+                }
               })}
             </div>
           )}

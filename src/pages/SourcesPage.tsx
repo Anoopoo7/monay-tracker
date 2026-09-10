@@ -14,7 +14,7 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
   onOpenAddSource,
   onSelectSource,
 }) => {
-  const { sources, spends } = useMoneyFlow();
+  const { sources, spends, transfers } = useMoneyFlow();
 
   return (
     <div className="space-y-4">
@@ -51,7 +51,7 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
         <div className="space-y-3">
           {sources.map((source) => {
             const spent = getSourceSpent(source.id, spends);
-            const balance = getSourceBalance(source, spends);
+            const balance = getSourceBalance(source, spends, transfers);
 
             return (
               <div

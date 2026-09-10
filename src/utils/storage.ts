@@ -1,4 +1,4 @@
-import { AppData, Category, MoneySource, Spend } from '../types/money';
+import { AppData, Category, MoneySource, Spend, Transfer } from '../types/money';
 import { getTodayInputDate } from './formatters';
 
 export const STORAGE_KEY = 'money-flow-data';
@@ -79,10 +79,22 @@ export const INITIAL_SAMPLE_DATA: AppData = {
       createdAt: new Date().toISOString(),
     },
   ],
+  transfers: [
+    {
+      id: 'transfer-sample-1',
+      fromSourceId: 'src-sbi',
+      toSourceId: 'src-cash',
+      amount: 10000,
+      date: getTodayInputDate(),
+      note: 'ATM withdrawal',
+      createdAt: new Date().toISOString(),
+    },
+  ],
 };
 
 /**
  * Load application data from localStorage with fallback to initial sample data
+ * Automatically migrates older data missing 'transfers' to transfers: []
  */
 export const loadAppData = (): AppData => {
   try {
@@ -98,12 +110,13 @@ export const loadAppData = (): AppData => {
       Array.isArray(parsed.sources) &&
       Array.isArray(parsed.spends)
     ) {
-      return {
+      const appData: AppData = {
         categories: parsed.categories,
         sources: parsed.sources,
         spends: parsed.spends,
         transfers: Array.isArray(parsed.transfers) ? parsed.transfers : [],
       };
+      return appData;
     }
   } catch (e) {
     console.error('Failed to load data from localStorage', e);
@@ -124,7 +137,7 @@ export const saveAppData = (data: AppData): void => {
 };
 
 /**
- * Trigger download of formatted JSON backup file
+ * Trigger download of formatted JSON backup file including transfers
  */
 export const exportAppDataAsJSON = (data: AppData): void => {
   const dateStr = getTodayInputDate();
@@ -132,7 +145,7 @@ export const exportAppDataAsJSON = (data: AppData): void => {
   const jsonStr = JSON.stringify(data, null, 2);
   const blob = new Blob([jsonStr], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
-  
+
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
@@ -144,6 +157,7 @@ export const exportAppDataAsJSON = (data: AppData): void => {
 
 /**
  * Validate JSON content before importing to prevent corrupted state
+ * Supports legacy backups without 'transfers' field
  */
 export const validateAndImportAppData = (
   jsonString: string
@@ -187,11 +201,22 @@ export const validateAndImportAppData = (
       createdAt: String(sp.createdAt || new Date().toISOString()),
     }));
 
+    const rawTransfers = Array.isArray(parsed.transfers) ? parsed.transfers : [];
+    const validTransfers: Transfer[] = rawTransfers.map((t: any, index: number) => ({
+      id: String(t.id || `imported-transfer-${index}-${Date.now()}`),
+      fromSourceId: String(t.fromSourceId || ''),
+      toSourceId: String(t.toSourceId || ''),
+      amount: Number(t.amount) > 0 ? Number(t.amount) : 0,
+      date: String(t.date || getTodayInputDate()),
+      note: t.note ? String(t.note) : undefined,
+      createdAt: String(t.createdAt || new Date().toISOString()),
+    }));
+
     const validatedData: AppData = {
       categories: validCategories,
       sources: validSources,
       spends: validSpends,
-      transfers: Array.isArray(parsed.transfers) ? parsed.transfers : [],
+      transfers: validTransfers,
     };
 
     saveAppData(validatedData);
@@ -217,6 +242,7 @@ export const clearAllData = (): AppData => {
     categories: [],
     sources: [],
     spends: [],
+    transfers: [],
   };
   saveAppData(emptyData);
   return emptyData;
